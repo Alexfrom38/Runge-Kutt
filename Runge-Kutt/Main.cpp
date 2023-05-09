@@ -1,6 +1,7 @@
 #include<iostream>
 #include <fstream>
 #include<cmath>
+#include<omp.h>
 void Insert_In_File(double* new_array, size_t count, std::fstream& stream)
 {
 	if (stream.is_open())
@@ -89,7 +90,7 @@ int main()
 	double* K3 = new double[count];
 	double* K4 = new double[count];
 
-	
+	double t1 = 0, t2 = 0, dt = 0;
 
 
 	for (size_t q = 0; q < count; q++)
@@ -99,6 +100,9 @@ int main()
 
 
 	Insert_In_File(temp_array, count, f);
+
+	t1 = omp_get_wtime();
+	int a = 1;
 
 	while (time <= T_max)
 	{
@@ -114,24 +118,27 @@ int main()
 		K3[count - 1] = 0;
 		K4[0] = 0;
 		K4[count - 1] = 0;
-
-		for (int a = 1; a < count - 1; a++)
-		{
-			K1[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, 0, 0);
-			K2[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K1[a],  (deltaT / 2));
-			K3[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K2[a], (deltaT / 2));
-			K4[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K3[a], deltaT);
-			curr_array[a] = temp_array[a] + (deltaT / 6) * (K1[a] + (2 * K2[a]) + (2 * K3[a]) + K4[a]);
+	
+		#pragma omp parallel for shared(temp_array,curr_array,K1,K2,K3,K4) private(a) schedule (static,8 )
+			for (a = 1; a < count - 1; a++)
+			{
+				K1[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, 0, 0);
+				K2[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K1[a], (deltaT / 2));
+				K3[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K2[a], (deltaT / 2));
+				K4[a] = Get_Another_Another_A_Part_Of_Approximation(temp_array[a - 1], temp_array[a], temp_array[a + 1], deltaX, 1, K3[a], deltaT);
+				curr_array[a] = temp_array[a] + (deltaT / 6) * (K1[a] + (2 * K2[a]) + (2 * K3[a]) + K4[a]);
+				//std::cout << a << std::endl;
+			}
+			a = 1;
 			
-		}
-		if (i % 100000 == 0)
-		{
-			//Insert_In_File(curr_array, count, f);
-			std::cout << time << std::endl;
-		}
-		//for (size_t q = 0; q < count; q++)
-		//	temp_array[q] = curr_array[q];
-
+			if (i % 100000 == 0)
+			{
+				//Insert_In_File(curr_array, count, f);
+				std::cout << time << std::endl;
+			}
+			//for (size_t q = 0; q < count; q++)
+			//	temp_array[q] = curr_array[q];
+		
 		tmp_buffer = temp_array;
 		temp_array = curr_array;
 		curr_array = tmp_buffer;
@@ -139,7 +146,10 @@ int main()
 		//std::cout << time << std::endl;
 		i++;
 	}
-
+	t2 = omp_get_wtime();
+	dt = t2 - t1;
+	std::cout << dt << std::endl;
+	
 	Insert_In_File(curr_array, count, f);
 	f.close();
 	delete[] temp_array;
